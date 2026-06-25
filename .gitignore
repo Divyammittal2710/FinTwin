@@ -1,0 +1,14 @@
+# Environment variables \'97 NEVER commit these\
+backend/.env\
+\
+# Python\
+backend/venv/\
+backend/__pycache__/\
+backend/*.pyc\
+\
+# Node\
+frontend/node_modules/\
+frontend/dist/\
+\
+# Mac\
+.DS_Store}
