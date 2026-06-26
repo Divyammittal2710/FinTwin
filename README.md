@@ -207,7 +207,7 @@ This is what makes FinTwin **agentic** — it doesn't wait for the user to ask. 
 
 ---
 
-## Demo Flow (for judges)
+## Demo Flow
 
 1. Click **Get Started** — Finn begins onboarding
 2. Answer 6-8 questions naturally (or use quick reply chips)
@@ -217,13 +217,6 @@ This is what makes FinTwin **agentic** — it doesn't wait for the user to ask. 
 6. Try the **Simulator** — drag the slider and watch health score change
 7. Open **Budget** tab — pie chart + goal timeline calculator with allocation slider
 8. Open **Where to Invest** — options ranked by your risk appetite
-
----
-
-## Team
-
-Built for the SBI Hackathon — Agentic AI & Emerging Tech Track
-
 ---
 
 *"We didn't build a chatbot. We built a financial co-pilot that knows you better than a branch manager who's met you 10 times."*
