@@ -92,12 +92,12 @@ def compute_gaps(twin: dict) -> list:
 
     # Working professional gaps
     if monthly_expenses > 0:
-        required_emergency = monthly_expenses * 6
+        required_emergency = monthly_expenses * 3
         if savings < required_emergency:
             gaps.append({
                 "type": "emergency_fund",
                 "severity": "high" if savings < monthly_expenses * 2 else "medium",
-                "message": f"Emergency fund short by ₹{required_emergency - savings:,} (need 6 months of expenses)",
+                "message": f"Emergency fund short by ₹{required_emergency - savings:,} (need 3 months of expenses)",
                 "gap_amount": required_emergency - savings
             })
 
