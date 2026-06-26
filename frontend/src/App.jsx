@@ -180,34 +180,34 @@ function BudgetPieChart({ twin }) {
 function GoalTimeline({ twin }) {
   const [goalName, setGoalName] = useState("")
   const [goalAmount, setGoalAmount] = useState("")
+  const [allocation, setAllocation] = useState(30)
   const [result, setResult] = useState(null)
 
   const monthlySavings = twin.monthly_savings || 0
+  const allocatedSavings = Math.floor(monthlySavings * allocation / 100)
 
   const calculate = () => {
-    const target = parseInt(goalAmount.replace(/,/g, ""))
-    if (!target || monthlySavings <= 0) return
+    const target = parseInt(goalAmount.replace(/,/g, "").replace(/\./g, ""))
+    if (!target || allocatedSavings <= 0) return
 
-    const months = Math.ceil(target / monthlySavings)
+    const months = Math.ceil(target / allocatedSavings)
     const years = Math.floor(months / 12)
     const remainingMonths = months % 12
-
     const timeStr = years > 0
-      ? `${years} year${years > 1 ? "s" : ""}${remainingMonths > 0 ? ` ${remainingMonths} month${remainingMonths > 1 ? "s" : ""}` : ""}`
+      ? `${years} yr${years > 1 ? "s" : ""}${remainingMonths > 0 ? ` ${remainingMonths} mo` : ""}`
       : `${months} month${months > 1 ? "s" : ""}`
 
-    // With 7% FD returns on savings
-    const monthlyRate = 0.07 / 12
+    const monthlyRate = 0.071 / 12
     const monthsWithReturns = Math.ceil(
-      Math.log(1 + (target * monthlyRate) / monthlySavings) / Math.log(1 + monthlyRate)
+      Math.log(1 + (target * monthlyRate) / allocatedSavings) / Math.log(1 + monthlyRate)
     )
     const yearsWR = Math.floor(monthsWithReturns / 12)
     const monthsWR = monthsWithReturns % 12
     const timeStrWR = yearsWR > 0
-      ? `${yearsWR} year${yearsWR > 1 ? "s" : ""}${monthsWR > 0 ? ` ${monthsWR} month${monthsWR > 1 ? "s" : ""}` : ""}`
+      ? `${yearsWR} yr${yearsWR > 1 ? "s" : ""}${monthsWR > 0 ? ` ${monthsWR} mo` : ""}`
       : `${monthsWithReturns} month${monthsWithReturns > 1 ? "s" : ""}`
 
-    setResult({ target, months, timeStr, monthsWithReturns, timeStrWR, saved: monthlySavings * months })
+    setResult({ target, months, timeStr, monthsWithReturns, timeStrWR })
   }
 
   return (
@@ -216,22 +216,38 @@ function GoalTimeline({ twin }) {
         Goal Timeline Calculator
       </div>
       <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
-        <input
-          value={goalName}
-          onChange={e => setGoalName(e.target.value)}
-          placeholder="Goal name (e.g. Car, Europe trip)"
-          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }}
-        />
-        <input
-          value={goalAmount}
-          onChange={e => setGoalAmount(e.target.value)}
+        <input value={goalName} onChange={e => setGoalName(e.target.value)}
+          placeholder="Goal (e.g. Car, Europe trip)"
+          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }} />
+        <input value={goalAmount} onChange={e => setGoalAmount(e.target.value)}
           placeholder="Target amount (₹)"
-          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }}
-        />
+          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }} />
         <button onClick={calculate}
           style={{ background: C.primary, color: C.white, border: "none", borderRadius: "8px", padding: "10px 20px", fontSize: "14px", cursor: "pointer", fontWeight: "500", whiteSpace: "nowrap" }}>
           Calculate
         </button>
+      </div>
+
+      {/* Allocation slider */}
+      <div style={{ background: C.bg, borderRadius: "10px", padding: "16px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "10px" }}>
+          <span style={{ color: C.text, fontWeight: "500" }}>
+            Allocating {allocation}% of savings to this goal
+          </span>
+          <span style={{ color: C.primary, fontWeight: "600" }}>
+            ₹{allocatedSavings.toLocaleString()}/month
+          </span>
+        </div>
+        <input type="range" min="10" max="100" step="5" value={allocation}
+          onChange={e => { setAllocation(Number(e.target.value)); setResult(null) }}
+          style={{ width: "100%", accentColor: C.primary }} />
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: C.textTertiary, marginTop: "4px" }}>
+          <span>10% (₹{Math.floor(monthlySavings * 0.1).toLocaleString()})</span>
+          <span>100% (₹{monthlySavings.toLocaleString()})</span>
+        </div>
+        <div style={{ fontSize: "12px", color: C.textSecondary, marginTop: "8px" }}>
+          Remaining ₹{(monthlySavings - allocatedSavings).toLocaleString()}/month goes to other goals & investments
+        </div>
       </div>
 
       {monthlySavings <= 0 && (
@@ -241,21 +257,22 @@ function GoalTimeline({ twin }) {
       )}
 
       {result && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
           <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "20px" }}>
             <div style={{ fontSize: "11px", color: C.textTertiary, fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Without Returns</div>
             <div style={{ fontSize: "22px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{result.timeStr}</div>
-            <div style={{ fontSize: "13px", color: C.textSecondary }}>saving ₹{monthlySavings.toLocaleString()}/month</div>
+            <div style={{ fontSize: "13px", color: C.textSecondary }}>₹{allocatedSavings.toLocaleString()}/month allocated</div>
           </div>
           <div style={{ background: C.successLight, border: `1px solid ${C.success}`, borderRadius: "12px", padding: "20px" }}>
-            <div style={{ fontSize: "11px", color: C.success, fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>With 7% FD Returns</div>
+            <div style={{ fontSize: "11px", color: C.success, fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>With 7.1% FD Returns</div>
             <div style={{ fontSize: "22px", fontWeight: "700", color: C.success, marginBottom: "4px" }}>{result.timeStrWR}</div>
             <div style={{ fontSize: "13px", color: C.success }}>faster with smart savings</div>
           </div>
           <div style={{ background: C.primaryLight, border: `1px solid ${C.primary}`, borderRadius: "12px", padding: "16px", gridColumn: "span 2" }}>
-            <div style={{ fontSize: "13px", color: C.primary }}>
-              {goalName || "Your goal"} of <strong>₹{result.target.toLocaleString()}</strong> is achievable.
-              Put savings in SBI Savings Plus Account to reach it faster with 7.1% returns.
+            <div style={{ fontSize: "13px", color: C.primary, lineHeight: "1.6" }}>
+              {goalName || "Your goal"} of <strong>₹{result.target.toLocaleString()}</strong> is achievable
+              while still saving <strong>₹{(monthlySavings - allocatedSavings).toLocaleString()}/month</strong> for other goals.
+              Use SBI Savings Plus for 7.1% guaranteed returns.
             </div>
           </div>
         </div>
@@ -385,19 +402,21 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("overview")
   const bottomRef = useRef(null)
 
+  const profileReady = twin?.name && twin?.monthly_income && twin?.life_stage
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   useEffect(() => {
-    if (!twin?.name) return
+    if (!profileReady) return
     axios.get(`${API}/recommendations/${SESSION_ID}`)
       .then(res => setRecommendations(res.data.recommendations || []))
       .catch(() => { })
   }, [twin])
 
   useEffect(() => {
-    if (!twin?.name) return
+    if (!profileReady) return
     const fetchNudges = () => {
       axios.get(`${API}/nudges/${SESSION_ID}`)
         .then(res => setNudges(res.data.nudges || []))
@@ -409,7 +428,7 @@ export default function App() {
   }, [twin])
 
   useEffect(() => {
-    if (!twin?.name) return
+    if (!profileReady) return
     axios.get(`${API}/investment-guide/${SESSION_ID}`)
       .then(res => setInvestGuide(res.data.guide || []))
       .catch(() => { })
@@ -597,7 +616,7 @@ export default function App() {
 
         {/* RIGHT PANEL */}
         <div style={{ flex: 1, overflowY: "auto", height: "100vh" }}>
-          {!twin?.name ? (
+          {!profileReady ? (
             <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "40px" }}>
               <div style={{ width: "64px", height: "64px", background: C.white, border: `1px solid ${C.border}`, borderRadius: "16px", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.textTertiary} strokeWidth="1.5" strokeLinecap="round">
@@ -606,8 +625,24 @@ export default function App() {
               </div>
               <h2 style={{ fontSize: "20px", fontWeight: "700", marginBottom: "8px", color: C.text }}>Your Financial Twin</h2>
               <p style={{ color: C.textSecondary, fontSize: "14px", lineHeight: "1.7", maxWidth: "300px" }}>
-                Start a conversation with Finn. Your financial profile will appear here in real time.
+                {started
+                  ? "Keep chatting with Finn. Your dashboard will appear once your basic profile is ready."
+                  : "Start a conversation with Finn. Your financial profile will appear here in real time."}
               </p>
+              {started && (
+                <div style={{ marginTop: "24px", display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "center", maxWidth: "360px" }}>
+                  {[
+                    { label: "Name", done: !!twin?.name },
+                    { label: "Life Stage", done: !!twin?.life_stage },
+                    { label: "Income", done: !!twin?.monthly_income },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", background: item.done ? C.successLight : C.borderLight, border: `1px solid ${item.done ? C.success : C.border}`, borderRadius: "20px", padding: "5px 12px" }}>
+                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: item.done ? C.success : C.textTertiary }} />
+                      <span style={{ fontSize: "12px", color: item.done ? C.success : C.textTertiary, fontWeight: "500" }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ padding: "36px 40px", maxWidth: "1100px" }}>
