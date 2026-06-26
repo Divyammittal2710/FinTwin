@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from llm_service import chat_and_extract
 from twin_engine import DEFAULT_TWIN, update_twin, compute_metrics
-from products import get_recommendations
+from products import get_recommendations, get_investment_guide
 from nudge_engine import generate_nudges
 import copy
 
@@ -71,7 +71,25 @@ def get_product_recommendations(session_id: str):
         return {"recommendations": []}
     twin = sessions[session_id]["twin"]
     gaps = twin.get("gaps", [])
-    return {"recommendations": get_recommendations(gaps)}
+    return {"recommendations": get_recommendations(gaps, twin)}
+
+@app.get("/nudges/{session_id}")
+def get_nudges(session_id: str):
+    if session_id not in sessions:
+        return {"nudges": []}
+    twin = sessions[session_id]["twin"]
+    return {"nudges": generate_nudges(twin)}
+
+@app.get("/investment-guide/{session_id}")
+def investment_guide(session_id: str):
+    if session_id not in sessions:
+        return {"guide": [], "risk_appetite": "moderate"}
+    twin = sessions[session_id]["twin"]
+    risk = twin.get("risk_appetite") or "moderate"
+    return {
+        "guide": get_investment_guide(risk),
+        "risk_appetite": risk
+    }
 
 @app.post("/scenario")
 def run_scenario(payload: ScenarioRequest):
@@ -80,12 +98,10 @@ def run_scenario(payload: ScenarioRequest):
 
     simulated = copy.deepcopy(sessions[payload.session_id]["twin"])
 
-    # Simulate 12 months of extra saving — more realistic projection
     extra_annual = payload.extra_monthly_savings * 12
     simulated["savings_account"] = (simulated.get("savings_account") or 0) + extra_annual
     simulated["monthly_savings"] = (simulated.get("monthly_savings") or 0) + payload.extra_monthly_savings
 
-    # If student with no income, treat extra savings as their income
     if not simulated.get("monthly_income"):
         simulated["monthly_income"] = payload.extra_monthly_savings
 
@@ -97,14 +113,22 @@ def run_scenario(payload: ScenarioRequest):
         "simulated_twin": simulated
     }
 
-@app.get("/nudges/{session_id}")
-def get_nudges(session_id: str):
-    """
-    Proactively generates nudges from the current twin state.
-    This is the agentic layer — fires without user asking.
-    """
-    if session_id not in sessions:
-        return {"nudges": []}
-    twin = sessions[session_id]["twin"]
-    nudges = generate_nudges(twin)
-    return {"nudges": nudges}
+@app.get("/test-nudges")
+def test_nudges():
+    fake_twin = {
+        "name": "Divyam",
+        "age": 20,
+        "life_stage": "student",
+        "monthly_income": 0,
+        "fixed_expenses": 5000,
+        "variable_expenses": 3000,
+        "savings_account": 2000,
+        "investments": 0,
+        "monthly_savings": 0,
+        "net_worth": 2000,
+        "emergency_fund_months": 0.4,
+        "health_score": 10,
+        "goals": [],
+        "gaps": []
+    }
+    return {"nudges": generate_nudges(fake_twin)}

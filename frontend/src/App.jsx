@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import axios from "axios"
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 
 const SESSION_ID = "user_" + Math.random().toString(36).substr(2, 9)
 const API = "http://localhost:8000"
@@ -56,9 +57,7 @@ function StatCard({ label, value, color }) {
   return (
     <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "20px" }}>
       <div style={{ fontSize: "11px", color: C.textTertiary, fontWeight: "600", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.6px" }}>{label}</div>
-      <div style={{ fontSize: "22px", fontWeight: "700", color: isEmpty ? C.textTertiary : (color || C.text) }}>
-        {value}
-      </div>
+      <div style={{ fontSize: "22px", fontWeight: "700", color: isEmpty ? C.textTertiary : (color || C.text) }}>{value}</div>
     </div>
   )
 }
@@ -89,6 +88,11 @@ function ProductCard({ product }) {
           </div>
           <div style={{ fontSize: "15px", fontWeight: "600", color: C.text, marginBottom: "6px" }}>{product.name}</div>
           <div style={{ fontSize: "13px", color: C.textSecondary, lineHeight: "1.6" }}>{product.description}</div>
+          {product.gap_message && (
+            <div style={{ marginTop: "10px", fontSize: "12px", color: C.textSecondary, background: C.bg, padding: "8px 12px", borderRadius: "6px" }}>
+              Why this: {product.gap_message}
+            </div>
+          )}
         </div>
         <button style={{ background: C.primary, color: C.white, border: "none", borderRadius: "8px", padding: "8px 16px", fontSize: "13px", cursor: "pointer", fontWeight: "500", whiteSpace: "nowrap", flexShrink: 0 }}>
           {product.cta}
@@ -114,6 +118,152 @@ function ProgressBar({ label, current, target, color }) {
   )
 }
 
+function BudgetPieChart({ twin }) {
+  const fixed = twin.fixed_expenses || 0
+  const variable = twin.variable_expenses || 0
+  const savings = twin.monthly_savings || 0
+  const income = twin.monthly_income || 0
+
+  if (!income) return (
+    <div style={{ textAlign: "center", padding: "40px", color: C.textSecondary, fontSize: "14px" }}>
+      Income data needed to show budget breakdown.
+    </div>
+  )
+
+  const data = [
+    { name: "Fixed Expenses", value: fixed, color: C.danger },
+    { name: "Variable Expenses", value: variable, color: C.warning },
+    { name: "Savings", value: Math.max(savings, 0), color: C.success },
+  ].filter(d => d.value > 0)
+
+  return (
+    <div>
+      <div style={{ fontSize: "11px", fontWeight: "600", color: C.textTertiary, marginBottom: "20px", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        Monthly Budget Breakdown
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
+        <ResponsiveContainer width={180} height={180}>
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+              {data.map((entry, index) => (
+                <Cell key={index} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div style={{ flex: 1 }}>
+          {data.map((item, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: item.color }} />
+                <span style={{ fontSize: "13px", color: C.text }}>{item.name}</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "14px", fontWeight: "600", color: C.text }}>₹{item.value.toLocaleString()}</div>
+                <div style={{ fontSize: "11px", color: C.textTertiary }}>{Math.round((item.value / income) * 100)}%</div>
+              </div>
+            </div>
+          ))}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px", marginTop: "4px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: C.text }}>Total Income</span>
+              <span style={{ fontSize: "14px", fontWeight: "700", color: C.primary }}>₹{income.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function GoalTimeline({ twin }) {
+  const [goalName, setGoalName] = useState("")
+  const [goalAmount, setGoalAmount] = useState("")
+  const [result, setResult] = useState(null)
+
+  const monthlySavings = twin.monthly_savings || 0
+
+  const calculate = () => {
+    const target = parseInt(goalAmount.replace(/,/g, ""))
+    if (!target || monthlySavings <= 0) return
+
+    const months = Math.ceil(target / monthlySavings)
+    const years = Math.floor(months / 12)
+    const remainingMonths = months % 12
+
+    const timeStr = years > 0
+      ? `${years} year${years > 1 ? "s" : ""}${remainingMonths > 0 ? ` ${remainingMonths} month${remainingMonths > 1 ? "s" : ""}` : ""}`
+      : `${months} month${months > 1 ? "s" : ""}`
+
+    // With 7% FD returns on savings
+    const monthlyRate = 0.07 / 12
+    const monthsWithReturns = Math.ceil(
+      Math.log(1 + (target * monthlyRate) / monthlySavings) / Math.log(1 + monthlyRate)
+    )
+    const yearsWR = Math.floor(monthsWithReturns / 12)
+    const monthsWR = monthsWithReturns % 12
+    const timeStrWR = yearsWR > 0
+      ? `${yearsWR} year${yearsWR > 1 ? "s" : ""}${monthsWR > 0 ? ` ${monthsWR} month${monthsWR > 1 ? "s" : ""}` : ""}`
+      : `${monthsWithReturns} month${monthsWithReturns > 1 ? "s" : ""}`
+
+    setResult({ target, months, timeStr, monthsWithReturns, timeStrWR, saved: monthlySavings * months })
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: "11px", fontWeight: "600", color: C.textTertiary, marginBottom: "20px", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+        Goal Timeline Calculator
+      </div>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "16px" }}>
+        <input
+          value={goalName}
+          onChange={e => setGoalName(e.target.value)}
+          placeholder="Goal name (e.g. Car, Europe trip)"
+          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }}
+        />
+        <input
+          value={goalAmount}
+          onChange={e => setGoalAmount(e.target.value)}
+          placeholder="Target amount (₹)"
+          style={{ flex: 1, padding: "10px 14px", border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "14px", outline: "none", color: C.text, background: C.white }}
+        />
+        <button onClick={calculate}
+          style={{ background: C.primary, color: C.white, border: "none", borderRadius: "8px", padding: "10px 20px", fontSize: "14px", cursor: "pointer", fontWeight: "500", whiteSpace: "nowrap" }}>
+          Calculate
+        </button>
+      </div>
+
+      {monthlySavings <= 0 && (
+        <div style={{ background: C.warningLight, border: `1px solid ${C.warning}`, borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: C.warning }}>
+          Complete your financial profile with Finn to use the goal calculator.
+        </div>
+      )}
+
+      {result && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "8px" }}>
+          <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "20px" }}>
+            <div style={{ fontSize: "11px", color: C.textTertiary, fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Without Returns</div>
+            <div style={{ fontSize: "22px", fontWeight: "700", color: C.text, marginBottom: "4px" }}>{result.timeStr}</div>
+            <div style={{ fontSize: "13px", color: C.textSecondary }}>saving ₹{monthlySavings.toLocaleString()}/month</div>
+          </div>
+          <div style={{ background: C.successLight, border: `1px solid ${C.success}`, borderRadius: "12px", padding: "20px" }}>
+            <div style={{ fontSize: "11px", color: C.success, fontWeight: "600", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.5px" }}>With 7% FD Returns</div>
+            <div style={{ fontSize: "22px", fontWeight: "700", color: C.success, marginBottom: "4px" }}>{result.timeStrWR}</div>
+            <div style={{ fontSize: "13px", color: C.success }}>faster with smart savings</div>
+          </div>
+          <div style={{ background: C.primaryLight, border: `1px solid ${C.primary}`, borderRadius: "12px", padding: "16px", gridColumn: "span 2" }}>
+            <div style={{ fontSize: "13px", color: C.primary }}>
+              {goalName || "Your goal"} of <strong>₹{result.target.toLocaleString()}</strong> is achievable.
+              Put savings in SBI Savings Plus Account to reach it faster with 7.1% returns.
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function WhatIfPanel({ sessionId, currentScore }) {
   const [extraSavings, setExtraSavings] = useState(0)
   const [result, setResult] = useState(null)
@@ -127,11 +277,8 @@ function WhatIfPanel({ sessionId, currentScore }) {
         extra_monthly_savings: extraSavings,
         extra_investments: 0
       })
-      console.log("Scenario result:", res.data)
       setResult(res.data)
-    } catch (e) {
-      console.error("Scenario error:", e)
-    }
+    } catch (e) { console.error(e) }
     setLoading(false)
   }
 
@@ -150,27 +297,21 @@ function WhatIfPanel({ sessionId, currentScore }) {
           <span>₹0</span><span>₹50,000</span>
         </div>
       </div>
-
       <button onClick={runScenario} disabled={loading || extraSavings === 0}
         style={{ width: "100%", background: extraSavings === 0 ? C.borderLight : C.primary, color: extraSavings === 0 ? C.textTertiary : C.white, border: "none", borderRadius: "8px", padding: "12px", fontSize: "14px", cursor: extraSavings === 0 ? "default" : "pointer", fontWeight: "500" }}>
         {loading ? "Calculating..." : "Run Simulation"}
       </button>
-
       {result && (
         <div style={{ marginTop: "20px", background: C.bg, borderRadius: "10px", padding: "20px" }}>
           <div style={{ fontSize: "11px", color: C.textTertiary, marginBottom: "16px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.5px" }}>Projected Outcome</div>
           <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center" }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "32px", fontWeight: "700", color: C.textSecondary }}>
-                {result.original_score ?? "--"}
-              </div>
+              <div style={{ fontSize: "32px", fontWeight: "700", color: C.textSecondary }}>{result.original_score ?? "--"}</div>
               <div style={{ fontSize: "12px", color: C.textTertiary, marginTop: "4px" }}>Current</div>
             </div>
             <div style={{ fontSize: "20px", color: C.border }}>→</div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "32px", fontWeight: "700", color: scoreDiff > 0 ? C.success : scoreDiff < 0 ? C.danger : C.textSecondary }}>
-                {result.simulated_score ?? "--"}
-              </div>
+              <div style={{ fontSize: "32px", fontWeight: "700", color: scoreDiff > 0 ? C.success : scoreDiff < 0 ? C.danger : C.textSecondary }}>{result.simulated_score ?? "--"}</div>
               <div style={{ fontSize: "12px", color: C.textTertiary, marginTop: "4px" }}>Projected</div>
             </div>
           </div>
@@ -192,23 +333,17 @@ function WhatIfPanel({ sessionId, currentScore }) {
 
 function NudgePanel({ nudges }) {
   if (!nudges || nudges.length === 0) return null
-
   const typeStyles = {
     alert: { border: C.danger, dot: C.danger, badge: "Alert" },
     warning: { border: C.warning, dot: C.warning, badge: "Warning" },
     opportunity: { border: C.success, dot: C.success, badge: "Opportunity" },
     insight: { border: C.primary, dot: C.primary, badge: "Insight" },
   }
-
   return (
     <div style={{ marginBottom: "24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-        <div style={{ fontSize: "11px", fontWeight: "600", color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-          Proactive Alerts
-        </div>
-        <div style={{ background: C.danger, color: C.white, borderRadius: "10px", padding: "2px 7px", fontSize: "11px", fontWeight: "600" }}>
-          {nudges.length}
-        </div>
+        <div style={{ fontSize: "11px", fontWeight: "600", color: C.textTertiary, textTransform: "uppercase", letterSpacing: "0.6px" }}>Proactive Alerts</div>
+        <div style={{ background: C.danger, color: C.white, borderRadius: "10px", padding: "2px 7px", fontSize: "11px", fontWeight: "600" }}>{nudges.length}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {nudges.map((nudge, i) => {
@@ -246,6 +381,7 @@ export default function App() {
   const [quickReplies, setQuickReplies] = useState([])
   const [recommendations, setRecommendations] = useState([])
   const [nudges, setNudges] = useState([])
+  const [investGuide, setInvestGuide] = useState([])
   const [activeTab, setActiveTab] = useState("overview")
   const bottomRef = useRef(null)
 
@@ -254,11 +390,10 @@ export default function App() {
   }, [messages])
 
   useEffect(() => {
-    if (twin?.name) {
-      axios.get(`${API}/recommendations/${SESSION_ID}`)
-        .then(res => setRecommendations(res.data.recommendations || []))
-        .catch(() => { })
-    }
+    if (!twin?.name) return
+    axios.get(`${API}/recommendations/${SESSION_ID}`)
+      .then(res => setRecommendations(res.data.recommendations || []))
+      .catch(() => { })
   }, [twin])
 
   useEffect(() => {
@@ -271,6 +406,13 @@ export default function App() {
     fetchNudges()
     const interval = setInterval(fetchNudges, 30000)
     return () => clearInterval(interval)
+  }, [twin])
+
+  useEffect(() => {
+    if (!twin?.name) return
+    axios.get(`${API}/investment-guide/${SESSION_ID}`)
+      .then(res => setInvestGuide(res.data.guide || []))
+      .catch(() => { })
   }, [twin])
 
   const startConversation = async () => {
@@ -311,8 +453,10 @@ export default function App() {
 
   const tabs = [
     { id: "overview", label: "Overview" },
+    { id: "budget", label: "Budget" },
     { id: "goals", label: "Goals" },
     { id: "products", label: "Recommendations" },
+    { id: "invest", label: "Where to Invest" },
     { id: "simulator", label: "Simulator" },
   ]
 
@@ -398,9 +542,7 @@ export default function App() {
                       color: msg.role === "user" ? C.white : C.text,
                       padding: "10px 14px",
                       borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                      maxWidth: "84%",
-                      fontSize: "14px",
-                      lineHeight: "1.55",
+                      maxWidth: "84%", fontSize: "14px", lineHeight: "1.55",
                       border: msg.role === "assistant" ? `1px solid ${C.border}` : "none"
                     }}>
                       {msg.content}
@@ -484,10 +626,10 @@ export default function App() {
               </div>
 
               {/* Tabs */}
-              <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "28px" }}>
+              <div style={{ display: "flex", borderBottom: `1px solid ${C.border}`, marginBottom: "28px", overflowX: "auto" }}>
                 {tabs.map(tab => (
                   <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                    style={{ background: "none", border: "none", padding: "10px 20px", fontSize: "14px", cursor: "pointer", fontWeight: activeTab === tab.id ? "600" : "400", color: activeTab === tab.id ? C.primary : C.textSecondary, borderBottom: activeTab === tab.id ? `2px solid ${C.primary}` : "2px solid transparent", marginBottom: "-1px" }}>
+                    style={{ background: "none", border: "none", padding: "10px 20px", fontSize: "14px", cursor: "pointer", fontWeight: activeTab === tab.id ? "600" : "400", color: activeTab === tab.id ? C.primary : C.textSecondary, borderBottom: activeTab === tab.id ? `2px solid ${C.primary}` : "2px solid transparent", marginBottom: "-1px", whiteSpace: "nowrap" }}>
                     {tab.label}
                   </button>
                 ))}
@@ -501,7 +643,7 @@ export default function App() {
                     <StatCard label="Monthly Income" value={twin.monthly_income ? `₹${twin.monthly_income.toLocaleString()}` : "--"} color={C.success} />
                     <StatCard label="Monthly Savings" value={twin.monthly_savings != null ? `₹${twin.monthly_savings.toLocaleString()}` : "--"} color={C.primary} />
                     <StatCard label="Net Worth" value={twin.net_worth ? `₹${twin.net_worth.toLocaleString()}` : "--"} color={C.text} />
-                    <StatCard label="Emergency Fund" value={twin.emergency_fund_months ? `${twin.emergency_fund_months} mo` : "--"} color={twin.emergency_fund_months >= 6 ? C.success : C.warning} />
+                    <StatCard label="Emergency Fund" value={twin.emergency_fund_months ? `${twin.emergency_fund_months} mo` : "--"} color={twin.emergency_fund_months >= 3 ? C.success : C.warning} />
                   </div>
                   {twin.gaps?.length > 0 && (
                     <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
@@ -509,6 +651,18 @@ export default function App() {
                       {twin.gaps.map((gap, i) => <GapItem key={i} gap={gap} />)}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Budget */}
+              {activeTab === "budget" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                  <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
+                    <BudgetPieChart twin={twin} />
+                  </div>
+                  <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "24px" }}>
+                    <GoalTimeline twin={twin} />
+                  </div>
                 </div>
               )}
 
@@ -521,7 +675,7 @@ export default function App() {
                       {twin.savings_account != null && twin.monthly_income && (
                         <ProgressBar label="Emergency Buffer"
                           current={twin.savings_account || 0}
-                          target={Math.max((twin.fixed_expenses || 0) + (twin.variable_expenses || 0), twin.monthly_income) * 6}
+                          target={Math.max((twin.fixed_expenses || 0) + (twin.variable_expenses || 0), twin.monthly_income) * 3}
                           color={C.danger} />
                       )}
                       {twin.investments > 0 && (
@@ -556,6 +710,58 @@ export default function App() {
                   {recommendations.length > 0 ? recommendations.map((p, i) => <ProductCard key={i} product={p} />) : (
                     <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "32px", textAlign: "center" }}>
                       <p style={{ color: C.textSecondary, fontSize: "14px" }}>Complete your profile to receive personalized recommendations.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Where to Invest */}
+              {activeTab === "invest" && (
+                <div>
+                  <div style={{ fontSize: "13px", color: C.textSecondary, marginBottom: "8px" }}>
+                    Personalized investment options based on your{" "}
+                    <span style={{ color: C.primary, fontWeight: "600", textTransform: "capitalize" }}>
+                      {twin.risk_appetite || "moderate"}
+                    </span>{" "}
+                    risk appetite.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+                    {["conservative", "moderate", "aggressive"].map(r => (
+                      <div key={r} style={{
+                        padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "500", textTransform: "capitalize",
+                        background: twin.risk_appetite === r ? C.primary : C.borderLight,
+                        color: twin.risk_appetite === r ? C.white : C.textTertiary
+                      }}>{r}</div>
+                    ))}
+                  </div>
+                  {investGuide.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {investGuide.map((item, i) => (
+                        <div key={i} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "20px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                            <div>
+                              <div style={{ fontSize: "15px", fontWeight: "600", color: C.text, marginBottom: "4px" }}>{item.option}</div>
+                              <div style={{ fontSize: "12px", color: C.textTertiary }}>{item.ideal_for}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: "16px", fontWeight: "700", color: C.success }}>{item.returns}</div>
+                              <div style={{ fontSize: "11px", color: C.textTertiary }}>expected returns</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <div style={{ background: C.borderLight, borderRadius: "6px", padding: "4px 10px", fontSize: "12px", color: C.textSecondary }}>
+                              Risk: {item.risk}
+                            </div>
+                            <div style={{ background: C.borderLight, borderRadius: "6px", padding: "4px 10px", fontSize: "12px", color: C.textSecondary }}>
+                              Horizon: {item.horizon}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "32px", textAlign: "center" }}>
+                      <p style={{ color: C.textSecondary, fontSize: "14px" }}>Tell Finn your risk appetite to get personalized investment options.</p>
                     </div>
                   )}
                 </div>
